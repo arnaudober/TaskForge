@@ -330,6 +330,10 @@
     dateInput.type = 'date';
     dateInput.className = 'date-modal-input';
     dateInput.value = task.due || '';
+    if (!task.due) dateInput.classList.add('empty');
+    dateInput.addEventListener('change', () => {
+      dateInput.classList.toggle('empty', !dateInput.value);
+    });
     modal.appendChild(dateInput);
 
     const btns = document.createElement('div');

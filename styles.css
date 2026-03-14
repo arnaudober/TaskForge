@@ -480,6 +480,7 @@ header {
   transition: border-color var(--transition);
 }
 .date-modal-input:focus { border-color: var(--primary); }
+.date-modal-input.empty { color: var(--text-muted); }
 .date-modal-btns {
   display: flex;
   gap: 8px;
@@ -554,13 +555,13 @@ header {
 .btn-edit:hover { background: rgba(108,99,255,0.1); color: var(--primary); }
 .btn-delete:hover { background: rgba(255,92,106,0.1); color: var(--danger); }
 
-/* Save button — more prominent as primary edit action */
+/* Save button — same idle style as other icon buttons */
 .btn-save {
-  background: rgba(34,197,94,0.1);
-  color: var(--success);
+  background: none;
+  color: var(--text-muted);
   width: 34px; height: 34px;
 }
-.btn-save:hover { background: rgba(34,197,94,0.2); color: var(--success); transform: scale(1.1); }
+.btn-save:hover { background: rgba(34,197,94,0.12); color: var(--success); transform: scale(1.1); }
 
 /* ── Footer ── */
 .app-footer {
@@ -612,17 +613,23 @@ header {
   align-self: stretch;
 }
 
-/* Save button in editing state — filled primary */
+/* Save button in editing state — green on hover only */
 .task-item.editing .btn-save {
-  background: var(--primary);
-  color: #fff;
+  background: none;
+  color: var(--text-muted);
   border-radius: 8px;
   width: 34px; height: 34px;
-  box-shadow: 0 2px 8px rgba(108,99,255,0.3);
+  box-shadow: none;
 }
 .task-item.editing .btn-save:hover {
-  background: var(--primary-dark);
+  background: rgba(34,197,94,0.12);
+  color: var(--success);
   transform: scale(1.06);
+}
+
+/* Hide checkbox in edit mode */
+.task-item.editing .task-checkbox {
+  display: none;
 }
 
 /* ── Mobile ── */
