@@ -239,16 +239,102 @@ header {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  min-height: 60px;
+  min-height: 0;
 }
 
-#task-list:empty::after {
-  content: 'No tasks yet. Add one above!';
-  display: block;
-  text-align: center;
+/* ── Empty State ── */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 32px 0 20px;
+  gap: 8px;
+  animation: fadeInUp 0.35s ease;
+}
+.empty-state[hidden] { display: none; }
+
+.empty-illustration {
+  position: relative;
+  width: 72px; height: 72px;
+  background: linear-gradient(135deg, rgba(108,99,255,0.12), rgba(255,92,106,0.08));
+  border-radius: 20px;
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 6px;
+}
+.empty-illustration > i {
+  font-size: 2rem;
+  background: linear-gradient(135deg, #6c63ff, #ff5c6a);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.empty-dots {
+  position: absolute;
+  bottom: -10px;
+  display: flex; gap: 5px;
+}
+.empty-dots span {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--border);
+  animation: dotPulse 1.4s ease-in-out infinite;
+}
+.empty-dots span:nth-child(2) { animation-delay: 0.2s; }
+.empty-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes dotPulse {
+  0%, 80%, 100% { transform: scale(1); opacity: 0.5; }
+  40% { transform: scale(1.4); opacity: 1; }
+}
+
+.empty-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text);
+  margin-top: 6px;
+}
+.empty-sub {
+  font-size: 0.82rem;
   color: var(--text-muted);
-  font-size: 0.9rem;
-  padding: 24px 0;
+}
+
+/* ── Toast ── */
+.toast {
+  position: fixed;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-md);
+  padding: 12px 18px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.88rem;
+  color: var(--text);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+  z-index: 100;
+  white-space: nowrap;
+}
+.toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+  pointer-events: auto;
+}
+.toast-undo {
+  background: none;
+  border: none;
+  color: var(--primary);
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 /* ── Task Item ── */
@@ -261,16 +347,32 @@ header {
   border: 1.5px solid var(--border);
   border-radius: var(--radius-sm);
   transition: box-shadow var(--transition), border-color var(--transition), background var(--transition), opacity var(--transition), transform var(--transition);
-  animation: slideIn 0.22s ease;
+  animation: slideIn 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  cursor: grab;
 }
+.task-item:active { cursor: grabbing; }
 .task-item:hover {
   box-shadow: var(--shadow-sm);
   border-color: var(--primary);
   transform: translateX(2px);
 }
+.task-item.drag-over {
+  border-color: var(--primary);
+  background: rgba(108,99,255,0.06);
+  transform: scale(1.01);
+}
+.task-item.dragging {
+  opacity: 0.4;
+  cursor: grabbing;
+}
 
 @keyframes slideIn {
-  from { opacity: 0; transform: translateY(-10px); }
+  from { opacity: 0; transform: translateY(-12px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(10px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 
@@ -279,8 +381,25 @@ header {
   to   { opacity: 0; transform: translateX(30px); }
 }
 
+@keyframes bounceIn {
+  0%   { transform: scale(0.85); opacity: 0; }
+  60%  { transform: scale(1.06); opacity: 1; }
+  100% { transform: scale(1); }
+}
+
+.task-item.bounce {
+  animation: bounceIn 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
 .task-item.removing {
   animation: fadeOut 0.22s ease forwards;
+}
+
+/* strikethrough animate */
+.task-item.completed .task-text {
+  text-decoration: line-through;
+  color: var(--text-muted);
+  transition: color var(--transition), text-decoration-color var(--transition);
 }
 
 /* ── Checkbox ── */
@@ -323,9 +442,44 @@ header {
   word-break: break-word;
   transition: color var(--transition);
 }
-.task-item.completed .task-text {
-  text-decoration: line-through;
+
+/* ── Due Date ── */
+.task-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.task-due {
+  font-size: 0.72rem;
   color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.task-due.overdue {
+  color: var(--danger);
+  font-weight: 600;
+}
+.task-due.due-today {
+  color: #f59e0b;
+  font-weight: 600;
+}
+.due-input {
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  cursor: pointer;
+  outline: none;
+  font-family: inherit;
+  padding: 0;
+}
+.due-input::-webkit-calendar-picker-indicator {
+  opacity: 0.5;
+  cursor: pointer;
+  filter: invert(0.5);
 }
 
 /* ── Edit Input ── */
@@ -346,6 +500,7 @@ header {
   gap: 6px;
   opacity: 0;
   transition: opacity var(--transition);
+  flex-shrink: 0;
 }
 .task-item:hover .task-actions {
   opacity: 1;
@@ -355,12 +510,14 @@ header {
   background: none;
   border: none;
   cursor: pointer;
-  width: 30px; height: 30px;
-  border-radius: 6px;
+  width: 36px; height: 36px;
+  border-radius: 8px;
   display: flex; align-items: center; justify-content: center;
-  font-size: 0.82rem;
+  font-size: 0.9rem;
   transition: background var(--transition), color var(--transition), transform var(--transition);
   color: var(--text-muted);
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 .btn-icon:hover { transform: scale(1.15); }
 .btn-edit:hover { background: rgba(108,99,255,0.12); color: var(--primary); }
@@ -407,4 +564,5 @@ header {
   #add-btn span { display: none; }
   #add-btn { padding: 12px 14px; }
   .task-actions { opacity: 1; }
+  .btn-icon { width: 40px; height: 40px; font-size: 1rem; }
 }
