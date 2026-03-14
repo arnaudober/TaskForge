@@ -2,7 +2,7 @@
 
 A lightweight, zero-dependency to-do app built with **Vanilla JS**, **HTML**, and **CSS** — no frameworks, no build tools, just clean code.
 
-![TaskForge screenshot](https://raw.githubusercontent.com/your-username/taskforge/main/screenshot.png)
+![TaskForge screenshot](https://raw.githubusercontent.com/arnaudober/taskforge/main/screenshot.png)
 
 ---
 
