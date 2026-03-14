@@ -248,28 +248,31 @@
     const editRow = document.createElement('div');
     editRow.className = 'task-meta-edit-row';
 
-    // Date picker button (no border, no icon — inline text style)
+    function renderDuePicker() {
+      duePicker.innerHTML = '';
+      const icon = document.createElement('i');
+      icon.className = 'fa-regular fa-calendar';
+      const label = document.createElement('span');
+      label.textContent = task.due ? formatDue(task.due) : 'Set date';
+      duePicker.appendChild(icon);
+      duePicker.appendChild(label);
+      duePicker.className = 'due-pick-btn';
+      if (task.due) {
+        const s = dueDateStatus(task.due);
+        if (s === 'overdue') duePicker.classList.add('overdue');
+        else if (s === 'due-today') duePicker.classList.add('due-today');
+      }
+    }
+
     const duePicker = document.createElement('button');
     duePicker.type = 'button';
-    duePicker.className = 'due-pick-btn';
-    duePicker.textContent = task.due ? '📅 ' + formatDue(task.due) : '📅 Set date';
-    if (task.due) {
-      const s = dueDateStatus(task.due);
-      if (s === 'overdue') duePicker.classList.add('overdue');
-      else if (s === 'due-today') duePicker.classList.add('due-today');
-    }
+    renderDuePicker();
     duePicker.addEventListener('mousedown', e => e.stopPropagation());
     duePicker.addEventListener('click', e => {
       e.stopPropagation();
       openDateModal(task, (picked) => {
         task.due = picked;
-        duePicker.textContent = picked ? '📅 ' + formatDue(picked) : '📅 Set date';
-        duePicker.className = 'due-pick-btn';
-        if (picked) {
-          const s = dueDateStatus(picked);
-          if (s === 'overdue') duePicker.classList.add('overdue');
-          else if (s === 'due-today') duePicker.classList.add('due-today');
-        }
+        renderDuePicker();
       });
     });
     editRow.appendChild(duePicker);
