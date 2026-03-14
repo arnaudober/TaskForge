@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>TaskForge</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <link rel="stylesheet" href="styles.css"/>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="logo">
+        <i class="fa-solid fa-bolt"></i>
+        <h1>TaskForge</h1>
+      </div>
+      <button id="theme-toggle" aria-label="Toggle dark mode">
+        <i class="fa-solid fa-moon"></i>
+      </button>
+    </header>
+
+    <form id="task-form">
+      <div class="input-wrapper">
+        <i class="fa-solid fa-pen-to-square input-icon"></i>
+        <input
+          type="text"
+          id="task-input"
+          placeholder="Add a new task…"
+          autocomplete="off"
+          maxlength="120"
+        />
+      </div>
+      <button type="submit" id="add-btn">
+        <i class="fa-solid fa-plus"></i>
+        <span>Add</span>
+      </button>
+    </form>
+
+    <div class="filters">
+      <button class="filter-btn active" data-filter="all">All</button>
+      <button class="filter-btn" data-filter="active">Active</button>
+      <button class="filter-btn" data-filter="completed">Completed</button>
+    </div>
+
+    <ul id="task-list"></ul>
+
+    <footer class="app-footer">
+      <span id="task-count">0 tasks left</span>
+      <button id="clear-completed">
+        <i class="fa-solid fa-trash-can"></i> Clear completed
+      </button>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
