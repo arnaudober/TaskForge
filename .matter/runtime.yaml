@@ -1,0 +1,10 @@
+preview-commands:
+  - id: serve
+    title: Start Static Server
+    description: Serves the TaskForge static files using Python's built-in HTTP server
+    command: |
+      #!/bin/bash
+      set -e
+
+      python3 -m http.server 8080 --bind 0.0.0.0
+preview-port: 8080
