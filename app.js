@@ -104,45 +104,19 @@
     span.textContent = task.text;
     meta.appendChild(span);
 
-    // Due date row — wrap a real visible date input with a label overlay
-    const dueRow = document.createElement('div');
-    const status = dueDateStatus(task.due);
-    dueRow.className = 'task-due' + (status === 'overdue' ? ' overdue' : status === 'due-today' ? ' due-today' : '');
-
-    const calIcon = document.createElement('i');
-    calIcon.className = 'fa-regular fa-calendar';
-    dueRow.appendChild(calIcon);
-
-    // Wrapper so we can overlay the label on top of the native input
-    const dueWrap = document.createElement('label');
-    dueWrap.className = 'due-wrap';
-    dueWrap.title = status === 'overdue' ? 'Overdue!' : status === 'due-today' ? 'Due today!' : 'Set due date';
-
-    const dueInput = document.createElement('input');
-    dueInput.type = 'date';
-    dueInput.className = 'due-input-native';
-    dueInput.value = task.due || '';
-    dueInput.setAttribute('aria-label', 'Due date');
-
-    const dueLabel = document.createElement('span');
-    dueLabel.className = 'due-label';
-    dueLabel.textContent = task.due ? formatDue(task.due) : 'Set date';
-
-    dueInput.addEventListener('change', (e) => {
-      e.stopPropagation();
-      task.due = dueInput.value || null;
-      save();
-      render();
-    });
-
-    // Prevent drag from starting when interacting with date
-    dueWrap.addEventListener('mousedown', e => e.stopPropagation());
-    dueWrap.addEventListener('dragstart', e => e.stopPropagation());
-
-    dueWrap.appendChild(dueLabel);
-    dueWrap.appendChild(dueInput);
-    dueRow.appendChild(dueWrap);
-    meta.appendChild(dueRow);
+    // Due date badge (read-only, shown only when a date is set)
+    if (task.due) {
+      const status = dueDateStatus(task.due);
+      const dueRow = document.createElement('div');
+      dueRow.className = 'task-due' + (status === 'overdue' ? ' overdue' : status === 'due-today' ? ' due-today' : '');
+      const calIcon = document.createElement('i');
+      calIcon.className = 'fa-regular fa-calendar';
+      const dueLabel = document.createElement('span');
+      dueLabel.textContent = formatDue(task.due);
+      dueRow.appendChild(calIcon);
+      dueRow.appendChild(dueLabel);
+      meta.appendChild(dueRow);
+    }
 
     // Actions
     const actions = document.createElement('div');
@@ -239,6 +213,10 @@
     const task = tasks.find(t => t.id === id);
     if (!task) return;
 
+    // Disable drag while editing
+    li.draggable = false;
+
+    // Replace text span with input
     const editInput = document.createElement('input');
     editInput.type = 'text';
     editInput.className = 'task-edit-input';
@@ -246,6 +224,45 @@
     editInput.maxLength = 120;
     meta.replaceChild(editInput, span);
 
+    // Remove existing due badge if any
+    const existingDue = meta.querySelector('.task-due');
+    if (existingDue) meta.removeChild(existingDue);
+
+    // Due date row with button to open modal
+    const dueRow = document.createElement('div');
+    dueRow.className = 'task-due-edit';
+
+    const calIcon = document.createElement('i');
+    calIcon.className = 'fa-regular fa-calendar';
+    dueRow.appendChild(calIcon);
+
+    const duePicker = document.createElement('button');
+    duePicker.type = 'button';
+    duePicker.className = 'due-pick-btn';
+    duePicker.textContent = task.due ? formatDue(task.due) : 'Set date';
+    if (task.due) {
+      const s = dueDateStatus(task.due);
+      if (s === 'overdue') duePicker.classList.add('overdue');
+      else if (s === 'due-today') duePicker.classList.add('due-today');
+    }
+    duePicker.addEventListener('mousedown', e => e.stopPropagation());
+    duePicker.addEventListener('click', e => {
+      e.stopPropagation();
+      openDateModal(task, (picked) => {
+        task.due = picked;
+        duePicker.textContent = picked ? formatDue(picked) : 'Set date';
+        duePicker.className = 'due-pick-btn';
+        if (picked) {
+          const s = dueDateStatus(picked);
+          if (s === 'overdue') duePicker.classList.add('overdue');
+          else if (s === 'due-today') duePicker.classList.add('due-today');
+        }
+      });
+    });
+    dueRow.appendChild(duePicker);
+    meta.appendChild(dueRow);
+
+    // Replace edit btn with save btn
     const editBtn = actions.querySelector('.btn-edit');
     const saveBtn = document.createElement('button');
     saveBtn.className = 'btn-icon btn-save';
@@ -270,9 +287,68 @@
     });
     editInput.addEventListener('blur', () => {
       setTimeout(() => {
-        if (document.activeElement !== saveBtn) commitEdit();
+        if (document.activeElement !== saveBtn && !document.querySelector('.date-modal')) commitEdit();
       }, 150);
     });
+  }
+
+  // ── Date Modal ─────────────────────────────────────────────────────────────
+  function openDateModal(task, onPick) {
+    // Remove any existing modal
+    const existing = document.querySelector('.date-modal-overlay');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.className = 'date-modal-overlay';
+
+    const modal = document.createElement('div');
+    modal.className = 'date-modal';
+
+    const title = document.createElement('p');
+    title.className = 'date-modal-title';
+    title.textContent = 'Set due date';
+    modal.appendChild(title);
+
+    const dateInput = document.createElement('input');
+    dateInput.type = 'date';
+    dateInput.className = 'date-modal-input';
+    dateInput.value = task.due || '';
+    modal.appendChild(dateInput);
+
+    const btns = document.createElement('div');
+    btns.className = 'date-modal-btns';
+
+    const clearBtn = document.createElement('button');
+    clearBtn.type = 'button';
+    clearBtn.className = 'date-modal-btn date-modal-clear';
+    clearBtn.textContent = 'Clear';
+    clearBtn.addEventListener('click', () => {
+      onPick(null);
+      overlay.remove();
+    });
+
+    const confirmBtn = document.createElement('button');
+    confirmBtn.type = 'button';
+    confirmBtn.className = 'date-modal-btn date-modal-confirm';
+    confirmBtn.textContent = 'Confirm';
+    confirmBtn.addEventListener('click', () => {
+      onPick(dateInput.value || null);
+      overlay.remove();
+    });
+
+    btns.appendChild(clearBtn);
+    btns.appendChild(confirmBtn);
+    modal.appendChild(btns);
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+
+    // Close on overlay click
+    overlay.addEventListener('click', e => {
+      if (e.target === overlay) overlay.remove();
+    });
+
+    // Focus the input to open picker on supporting browsers
+    setTimeout(() => dateInput.focus(), 50);
   }
 
   // ── Toast ──────────────────────────────────────────────────────────────────
