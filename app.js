@@ -229,14 +229,18 @@
     const existingDue = meta.querySelector('.task-due');
     if (existingDue) meta.removeChild(existingDue);
 
-    // Due date row with button to open modal
-    const dueRow = document.createElement('div');
-    dueRow.className = 'task-due-edit';
+    // Bottom row: date picker + save button side by side
+    const editRow = document.createElement('div');
+    editRow.className = 'task-meta-edit-row';
 
+    // Calendar icon
     const calIcon = document.createElement('i');
     calIcon.className = 'fa-regular fa-calendar';
-    dueRow.appendChild(calIcon);
+    calIcon.style.color = 'var(--text-muted)';
+    calIcon.style.fontSize = '0.75rem';
+    editRow.appendChild(calIcon);
 
+    // Date picker button
     const duePicker = document.createElement('button');
     duePicker.type = 'button';
     duePicker.className = 'due-pick-btn';
@@ -260,10 +264,11 @@
         }
       });
     });
-    dueRow.appendChild(duePicker);
-    meta.appendChild(dueRow);
+    editRow.appendChild(duePicker);
 
-    // Replace edit btn with save btn
+    meta.appendChild(editRow);
+
+    // Move save button into the edit row (right-aligned via flex spacer)
     const editBtn = actions.querySelector('.btn-edit');
     const saveBtn = document.createElement('button');
     saveBtn.className = 'btn-icon btn-save';
@@ -288,7 +293,7 @@
     });
     editInput.addEventListener('blur', () => {
       setTimeout(() => {
-        if (document.activeElement !== saveBtn && !document.querySelector('.date-modal')) commitEdit();
+        if (document.activeElement !== saveBtn && !document.querySelector('.date-modal-overlay')) commitEdit();
       }, 150);
     });
   }

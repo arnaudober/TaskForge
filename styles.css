@@ -96,18 +96,18 @@ header {
 }
 
 .logo i {
-  font-size: 1.5rem;
-  background: linear-gradient(135deg, #6c63ff, #ff5c6a);
+  font-size: 1.4rem;
+  background: linear-gradient(135deg, #6c63ff, #818cf8);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 
 .logo h1 {
-  font-size: 1.6rem;
+  font-size: 1.5rem;
   font-weight: 700;
   letter-spacing: -0.5px;
-  background: linear-gradient(135deg, #6c63ff 30%, #ff5c6a 100%);
+  background: linear-gradient(135deg, #6c63ff 0%, #818cf8 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -211,16 +211,16 @@ header {
 
 .filter-btn {
   flex: 1;
-  padding: 7px 10px;
-  border: 1.5px solid var(--border);
+  padding: 6px 10px;
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text-muted);
-  font-size: 0.82rem;
-  font-weight: 600;
+  font-size: 0.8rem;
+  font-weight: 500;
   cursor: pointer;
   transition: all var(--transition);
-  letter-spacing: 0.3px;
+  letter-spacing: 0.2px;
 }
 .filter-btn:hover {
   border-color: var(--primary);
@@ -323,8 +323,8 @@ header {
 .task-item {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 13px 16px;
+  gap: 14px;
+  padding: 14px 16px;
   background: var(--surface-2);
   border: 1.5px solid var(--border);
   border-radius: var(--radius-sm);
@@ -334,9 +334,9 @@ header {
 }
 .task-item:active { cursor: grabbing; }
 .task-item:hover {
-  box-shadow: var(--shadow-sm);
-  border-color: var(--primary);
-  transform: translateX(2px);
+  box-shadow: 0 4px 16px rgba(108,99,255,0.10);
+  border-color: rgba(108,99,255,0.4);
+  transform: translateY(-1px);
 }
 /* Drop indicator line */
 .drop-line {
@@ -381,9 +381,14 @@ header {
   animation: fadeOut 0.22s ease forwards;
 }
 
-/* strikethrough animate */
+/* Completed task visual treatment */
+.task-item.completed {
+  background: rgba(34, 197, 94, 0.04);
+  border-color: rgba(34, 197, 94, 0.18);
+}
 .task-item.completed .task-text {
   text-decoration: line-through;
+  text-decoration-color: var(--text-muted);
   color: var(--text-muted);
   transition: color var(--transition), text-decoration-color var(--transition);
 }
@@ -392,9 +397,9 @@ header {
 .task-checkbox {
   appearance: none;
   -webkit-appearance: none;
-  width: 20px; height: 20px;
+  width: 22px; height: 22px;
   border: 2px solid var(--border);
-  border-radius: 6px;
+  border-radius: 7px;
   cursor: pointer;
   flex-shrink: 0;
   display: flex;
@@ -433,7 +438,7 @@ header {
 .task-meta {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
   flex: 1;
   min-width: 0;
 }
@@ -554,14 +559,16 @@ header {
   background: transparent;
   color: var(--text);
   font-size: 0.95rem;
+  font-weight: 500;
   outline: none;
-  padding: 2px 4px;
+  padding: 3px 2px 4px;
+  width: 100%;
 }
 
 /* ── Action Buttons ── */
 .task-actions {
   display: flex;
-  gap: 6px;
+  gap: 4px;
   opacity: 0;
   transition: opacity var(--transition);
   flex-shrink: 0;
@@ -574,19 +581,26 @@ header {
   background: none;
   border: none;
   cursor: pointer;
-  width: 36px; height: 36px;
+  width: 34px; height: 34px;
   border-radius: 8px;
   display: flex; align-items: center; justify-content: center;
-  font-size: 0.9rem;
+  font-size: 0.88rem;
   transition: background var(--transition), color var(--transition), transform var(--transition);
   color: var(--text-muted);
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
 }
-.btn-icon:hover { transform: scale(1.15); }
-.btn-edit:hover { background: rgba(108,99,255,0.12); color: var(--primary); }
-.btn-delete:hover { background: rgba(255,92,106,0.12); color: var(--danger); }
-.btn-save:hover { background: rgba(34,197,94,0.12); color: var(--success); }
+.btn-icon:hover { transform: scale(1.1); }
+.btn-edit:hover { background: rgba(108,99,255,0.1); color: var(--primary); }
+.btn-delete:hover { background: rgba(255,92,106,0.1); color: var(--danger); }
+
+/* Save button — more prominent as primary edit action */
+.btn-save {
+  background: rgba(34,197,94,0.1);
+  color: var(--success);
+  width: 34px; height: 34px;
+}
+.btn-save:hover { background: rgba(34,197,94,0.2); color: var(--success); transform: scale(1.1); }
 
 /* ── Footer ── */
 .app-footer {
@@ -594,45 +608,61 @@ header {
   align-items: center;
   justify-content: space-between;
   margin-top: 20px;
-  padding-top: 16px;
-  border-top: 1px solid var(--border);
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
 }
 
 #task-count {
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   color: var(--text-muted);
   font-weight: 500;
 }
 
 #clear-completed {
   background: none;
-  border: 1px solid var(--border);
+  border: none;
   border-radius: var(--radius-sm);
   color: var(--text-muted);
   font-size: 0.8rem;
-  padding: 5px 12px;
+  padding: 4px 10px;
   cursor: pointer;
   display: flex; align-items: center; gap: 5px;
   transition: all var(--transition);
 }
 #clear-completed:hover {
-  border-color: var(--danger);
   color: var(--danger);
-  background: rgba(255,92,106,0.06);
+  background: rgba(255,92,106,0.08);
 }
 
 /* ── Edit mode card ── */
 .task-item.editing {
   border-color: var(--primary);
   background: var(--surface);
-  box-shadow: 0 0 0 3px rgba(108,99,255,0.13), var(--shadow-sm);
+  box-shadow: 0 0 0 3px rgba(108,99,255,0.12), 0 4px 16px rgba(108,99,255,0.1);
   cursor: default;
+  align-items: flex-start;
+  padding: 14px 16px;
 }
 .task-item.editing:hover {
   transform: none;
+  border-color: var(--primary);
 }
 .task-item.editing .task-actions {
   opacity: 1;
+  padding-top: 2px;
+}
+.task-item.editing .task-checkbox {
+  margin-top: 3px;
+}
+
+/* Edit meta layout */
+.task-meta-edit-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
 }
 
 /* ── Mobile ── */
