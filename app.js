@@ -104,7 +104,7 @@
     span.textContent = task.text;
     meta.appendChild(span);
 
-    // Due date row
+    // Due date row — wrap a real visible date input with a label overlay
     const dueRow = document.createElement('div');
     const status = dueDateStatus(task.due);
     dueRow.className = 'task-due' + (status === 'overdue' ? ' overdue' : status === 'due-today' ? ' due-today' : '');
@@ -113,41 +113,35 @@
     calIcon.className = 'fa-regular fa-calendar';
     dueRow.appendChild(calIcon);
 
+    // Wrapper so we can overlay the label on top of the native input
+    const dueWrap = document.createElement('label');
+    dueWrap.className = 'due-wrap';
+    dueWrap.title = status === 'overdue' ? 'Overdue!' : status === 'due-today' ? 'Due today!' : 'Set due date';
+
     const dueInput = document.createElement('input');
     dueInput.type = 'date';
-    dueInput.className = 'due-input';
+    dueInput.className = 'due-input-native';
     dueInput.value = task.due || '';
     dueInput.setAttribute('aria-label', 'Due date');
-    if (task.due) {
-      dueInput.title = status === 'overdue' ? 'Overdue!' : status === 'due-today' ? 'Due today!' : '';
-    }
 
-    // Show formatted label, click to change
     const dueLabel = document.createElement('span');
+    dueLabel.className = 'due-label';
     dueLabel.textContent = task.due ? formatDue(task.due) : 'Set date';
-    dueLabel.style.cursor = 'pointer';
-    dueLabel.style.opacity = task.due ? '1' : '0.5';
 
-    dueInput.style.position = 'absolute';
-    dueInput.style.opacity = '0';
-    dueInput.style.pointerEvents = 'none';
-    dueInput.style.width = '0';
-    dueInput.style.height = '0';
-
-    dueLabel.addEventListener('click', (e) => {
+    dueInput.addEventListener('change', (e) => {
       e.stopPropagation();
-      try { dueInput.showPicker(); } catch (_) { dueInput.click(); }
-    });
-
-    dueInput.addEventListener('change', () => {
       task.due = dueInput.value || null;
       save();
       render();
     });
 
-    dueRow.style.position = 'relative';
-    dueRow.appendChild(dueLabel);
-    dueRow.appendChild(dueInput);
+    // Prevent drag from starting when interacting with date
+    dueWrap.addEventListener('mousedown', e => e.stopPropagation());
+    dueWrap.addEventListener('dragstart', e => e.stopPropagation());
+
+    dueWrap.appendChild(dueLabel);
+    dueWrap.appendChild(dueInput);
+    dueRow.appendChild(dueWrap);
     meta.appendChild(dueRow);
 
     // Actions
@@ -343,7 +337,8 @@
     clearDropIndicators();
     const rect = this.getBoundingClientRect();
     const midY = rect.top + rect.height / 2;
-    if (e.clientY < midY) {
+    this._dropBefore = e.clientY < midY;
+    if (this._dropBefore) {
       this.classList.add('drop-before');
     } else {
       this.classList.add('drop-after');
@@ -353,6 +348,7 @@
   function onDragLeave(e) {
     if (!this.contains(e.relatedTarget)) {
       this.classList.remove('drop-before', 'drop-after');
+      this._dropBefore = undefined;
     }
   }
 
@@ -372,10 +368,8 @@
     let tgtIdx   = tasks.findIndex(t => t.id === targetId);
     if (srcIdx === -1 || tgtIdx === -1) return;
 
-    // Determine if dropping before or after the target
     const targetEl = taskList.querySelector(`[data-id="${targetId}"]`);
-    const rect = targetEl ? targetEl.getBoundingClientRect() : null;
-    const insertBefore = rect && e.clientY < rect.top + rect.height / 2;
+    const insertBefore = targetEl && targetEl._dropBefore;
 
     const [moved] = tasks.splice(srcIdx, 1);
     tgtIdx = tasks.findIndex(t => t.id === targetId);
