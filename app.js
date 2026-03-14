@@ -2,6 +2,8 @@
   // ── State ──────────────────────────────────────────────────────────────────
   let tasks = JSON.parse(localStorage.getItem('taskforge-tasks') || '[]');
   let currentFilter = 'all';
+  let toastTimer = null;
+  let undoSnapshot = null; // { tasks, deletedTask }
 
   // ── DOM refs ───────────────────────────────────────────────────────────────
   const form        = document.getElementById('task-form');
@@ -11,6 +13,8 @@
   const clearBtn    = document.getElementById('clear-completed');
   const themeToggle = document.getElementById('theme-toggle');
   const filterBtns  = document.querySelectorAll('.filter-btn');
+  const emptyState  = document.getElementById('empty-state');
+  const toast       = document.getElementById('toast');
   const html        = document.documentElement;
 
   // ── Theme ──────────────────────────────────────────────────────────────────
@@ -36,7 +40,7 @@
   }
 
   // ── Render ─────────────────────────────────────────────────────────────────
-  function render() {
+  function render(newId) {
     taskList.innerHTML = '';
 
     const filtered = tasks.filter(t => {
@@ -45,18 +49,44 @@
       return true;
     });
 
-    filtered.forEach(task => {
-      const li = createElement(task);
-      taskList.appendChild(li);
-    });
+    if (filtered.length === 0) {
+      emptyState.hidden = false;
+    } else {
+      emptyState.hidden = true;
+      filtered.forEach(task => {
+        const li = createElement(task, task.id === newId);
+        taskList.appendChild(li);
+      });
+    }
 
     updateFooter();
+    setupDragAndDrop();
   }
 
-  function createElement(task) {
+  // ── Due date helpers ───────────────────────────────────────────────────────
+  function dueDateStatus(due) {
+    if (!due) return null;
+    const today = new Date().toISOString().slice(0, 10);
+    if (due < today)  return 'overdue';
+    if (due === today) return 'due-today';
+    return 'upcoming';
+  }
+
+  function formatDue(due) {
+    if (!due) return '';
+    const [y, m, d] = due.split('-');
+    const today = new Date().toISOString().slice(0, 10);
+    if (due === today) return 'Today';
+    const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+    if (due === tomorrow) return 'Tomorrow';
+    return new Date(due + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  }
+
+  function createElement(task, bounce = false) {
     const li = document.createElement('li');
-    li.className = 'task-item' + (task.completed ? ' completed' : '');
+    li.className = 'task-item' + (task.completed ? ' completed' : '') + (bounce ? ' bounce' : '');
     li.dataset.id = task.id;
+    li.draggable = true;
 
     // Checkbox
     const checkbox = document.createElement('input');
@@ -65,10 +95,50 @@
     checkbox.checked = task.completed;
     checkbox.setAttribute('aria-label', 'Mark task complete');
 
-    // Text
+    // Meta (text + due)
+    const meta = document.createElement('div');
+    meta.className = 'task-meta';
+
     const span = document.createElement('span');
     span.className = 'task-text';
     span.textContent = task.text;
+    meta.appendChild(span);
+
+    // Due date row
+    const dueRow = document.createElement('div');
+    const status = dueDateStatus(task.due);
+    dueRow.className = 'task-due' + (status === 'overdue' ? ' overdue' : status === 'due-today' ? ' due-today' : '');
+
+    const calIcon = document.createElement('i');
+    calIcon.className = 'fa-regular fa-calendar';
+    dueRow.appendChild(calIcon);
+
+    const dueInput = document.createElement('input');
+    dueInput.type = 'date';
+    dueInput.className = 'due-input';
+    dueInput.value = task.due || '';
+    dueInput.setAttribute('aria-label', 'Due date');
+    if (task.due) {
+      dueInput.title = status === 'overdue' ? 'Overdue!' : status === 'due-today' ? 'Due today!' : '';
+    }
+
+    // Show formatted label, click to change
+    const dueLabel = document.createElement('span');
+    dueLabel.textContent = task.due ? formatDue(task.due) : 'Set date';
+    dueLabel.style.cursor = 'pointer';
+    dueLabel.style.opacity = task.due ? '1' : '0.5';
+    dueLabel.addEventListener('click', () => dueInput.showPicker?.() || dueInput.click());
+
+    dueInput.style.display = 'none';
+    dueInput.addEventListener('change', () => {
+      task.due = dueInput.value || null;
+      save();
+      render();
+    });
+
+    dueRow.appendChild(dueLabel);
+    dueRow.appendChild(dueInput);
+    meta.appendChild(dueRow);
 
     // Actions
     const actions = document.createElement('div');
@@ -88,7 +158,7 @@
     actions.appendChild(deleteBtn);
 
     li.appendChild(checkbox);
-    li.appendChild(span);
+    li.appendChild(meta);
     li.appendChild(actions);
 
     return li;
@@ -108,12 +178,13 @@
     const task = {
       id: Date.now().toString(),
       text,
-      completed: false
+      completed: false,
+      due: null
     };
 
     tasks.unshift(task);
     save();
-    render();
+    render(task.id);
     input.value = '';
     input.focus();
   });
@@ -126,11 +197,14 @@
 
     // Delete
     if (e.target.closest('.btn-delete')) {
+      const task = tasks.find(t => t.id === id);
+      undoSnapshot = { tasks: JSON.parse(JSON.stringify(tasks)), deletedTask: task };
       li.classList.add('removing');
       li.addEventListener('animationend', () => {
         tasks = tasks.filter(t => t.id !== id);
         save();
         render();
+        showToast(`"${task.text.slice(0, 28)}${task.text.length > 28 ? '…' : ''}" deleted`, true);
       }, { once: true });
       return;
     }
@@ -155,20 +229,19 @@
 
   // ── Edit ───────────────────────────────────────────────────────────────────
   function startEdit(li, id) {
+    const meta = li.querySelector('.task-meta');
     const span = li.querySelector('.task-text');
     const actions = li.querySelector('.task-actions');
     const task = tasks.find(t => t.id === id);
     if (!task) return;
 
-    // Replace span with input
     const editInput = document.createElement('input');
     editInput.type = 'text';
     editInput.className = 'task-edit-input';
     editInput.value = task.text;
     editInput.maxLength = 120;
-    li.replaceChild(editInput, span);
+    meta.replaceChild(editInput, span);
 
-    // Replace edit button with save button
     const editBtn = actions.querySelector('.btn-edit');
     const saveBtn = document.createElement('button');
     saveBtn.className = 'btn-icon btn-save';
@@ -189,14 +262,103 @@
     saveBtn.addEventListener('click', commitEdit);
     editInput.addEventListener('keydown', e => {
       if (e.key === 'Enter')  { e.preventDefault(); commitEdit(); }
-      if (e.key === 'Escape') { render(); } // cancel
+      if (e.key === 'Escape') { render(); }
     });
     editInput.addEventListener('blur', () => {
-      // Small delay so save button click fires first
       setTimeout(() => {
         if (document.activeElement !== saveBtn) commitEdit();
       }, 150);
     });
+  }
+
+  // ── Toast ──────────────────────────────────────────────────────────────────
+  function showToast(message, withUndo = false) {
+    clearTimeout(toastTimer);
+    toast.innerHTML = '';
+
+    const msg = document.createElement('span');
+    msg.textContent = message;
+    toast.appendChild(msg);
+
+    if (withUndo) {
+      const undoBtn = document.createElement('button');
+      undoBtn.className = 'toast-undo';
+      undoBtn.textContent = 'Undo';
+      undoBtn.addEventListener('click', () => {
+        if (undoSnapshot) {
+          tasks = undoSnapshot.tasks;
+          save();
+          render();
+          undoSnapshot = null;
+        }
+        hideToast();
+      });
+      toast.appendChild(undoBtn);
+    }
+
+    toast.classList.add('show');
+    toastTimer = setTimeout(hideToast, 4000);
+  }
+
+  function hideToast() {
+    toast.classList.remove('show');
+    undoSnapshot = null;
+  }
+
+  // ── Drag and Drop (reorder) ────────────────────────────────────────────────
+  let dragSrcId = null;
+
+  function setupDragAndDrop() {
+    const items = taskList.querySelectorAll('.task-item');
+    items.forEach(item => {
+      item.addEventListener('dragstart', onDragStart);
+      item.addEventListener('dragover',  onDragOver);
+      item.addEventListener('dragleave', onDragLeave);
+      item.addEventListener('drop',      onDrop);
+      item.addEventListener('dragend',   onDragEnd);
+    });
+  }
+
+  function onDragStart(e) {
+    dragSrcId = this.dataset.id;
+    this.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', dragSrcId);
+  }
+
+  function onDragOver(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (this.dataset.id !== dragSrcId) {
+      this.classList.add('drag-over');
+    }
+  }
+
+  function onDragLeave() {
+    this.classList.remove('drag-over');
+  }
+
+  function onDrop(e) {
+    e.preventDefault();
+    this.classList.remove('drag-over');
+    const targetId = this.dataset.id;
+    if (!dragSrcId || dragSrcId === targetId) return;
+
+    const srcIdx = tasks.findIndex(t => t.id === dragSrcId);
+    const tgtIdx = tasks.findIndex(t => t.id === targetId);
+    if (srcIdx === -1 || tgtIdx === -1) return;
+
+    const [moved] = tasks.splice(srcIdx, 1);
+    tasks.splice(tgtIdx, 0, moved);
+    save();
+    render();
+  }
+
+  function onDragEnd() {
+    taskList.querySelectorAll('.task-item').forEach(i => {
+      i.classList.remove('dragging', 'drag-over');
+    });
+    dragSrcId = null;
   }
 
   // ── Filters ────────────────────────────────────────────────────────────────
