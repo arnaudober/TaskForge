@@ -213,8 +213,9 @@
     const task = tasks.find(t => t.id === id);
     if (!task) return;
 
-    // Disable drag while editing
+    // Disable drag while editing, highlight edit state
     li.draggable = false;
+    li.classList.add('editing');
 
     // Replace text span with input
     const editInput = document.createElement('input');
