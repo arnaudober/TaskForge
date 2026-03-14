@@ -415,24 +415,30 @@ header {
 
 /* Edit-mode due date row */
 .task-meta-edit-row {
-  margin-top: 5px;
+  margin-top: 6px;
 }
 .due-pick-btn {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  background: none;
-  border: none;
+  gap: 5px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 20px;
   color: var(--text-muted);
   font-size: 0.75rem;
   font-family: inherit;
-  padding: 2px 0;
+  padding: 3px 10px 3px 8px;
   cursor: pointer;
-  transition: color var(--transition);
+  transition: border-color var(--transition), color var(--transition), background var(--transition);
 }
-.due-pick-btn:hover { color: var(--primary); }
-.due-pick-btn.overdue   { color: var(--danger); }
-.due-pick-btn.due-today { color: #f59e0b; }
+.due-pick-btn i { font-size: 0.7rem; }
+.due-pick-btn:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: rgba(108,99,255,0.06);
+}
+.due-pick-btn.overdue   { color: var(--danger); border-color: rgba(255,92,106,0.4); }
+.due-pick-btn.due-today { color: #f59e0b; border-color: rgba(245,158,11,0.4); }
 
 /* ── Date Modal ── */
 .date-modal-overlay {
