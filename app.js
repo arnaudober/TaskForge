@@ -158,24 +158,8 @@
   }
 
   function updateFooter() {
-    const active    = tasks.filter(t => !t.completed).length;
-    const completed = tasks.filter(t =>  t.completed).length;
-    const total     = tasks.length;
+    const active = tasks.filter(t => !t.completed).length;
     taskCount.textContent = `${active} task${active !== 1 ? 's' : ''} left`;
-
-    // Update filter badges
-    document.querySelectorAll('.filter-btn').forEach(btn => {
-      const f = btn.dataset.filter;
-      let count = f === 'all' ? total : f === 'active' ? active : completed;
-      let badge = btn.querySelector('.filter-badge');
-      if (!badge) {
-        badge = document.createElement('span');
-        badge.className = 'filter-badge';
-        btn.appendChild(badge);
-      }
-      badge.textContent = count;
-      badge.hidden = count === 0;
-    });
   }
 
   // ── Add Task ───────────────────────────────────────────────────────────────
