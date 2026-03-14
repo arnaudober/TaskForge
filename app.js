@@ -2,6 +2,8 @@
   // ── State ──────────────────────────────────────────────────────────────────
   let tasks = JSON.parse(localStorage.getItem('taskforge-tasks') || '[]');
   let currentFilter = 'all';
+  let toastTimer = null;
+  let undoSnapshot = null; // { tasks, deletedTask }
 
   // ── DOM refs ───────────────────────────────────────────────────────────────
   const form        = document.getElementById('task-form');
@@ -9,26 +11,9 @@
   const taskList    = document.getElementById('task-list');
   const taskCount   = document.getElementById('task-count');
   const clearBtn    = document.getElementById('clear-completed');
-  const themeToggle = document.getElementById('theme-toggle');
   const filterBtns  = document.querySelectorAll('.filter-btn');
-  const html        = document.documentElement;
-
-  // ── Theme ──────────────────────────────────────────────────────────────────
-  const savedTheme = localStorage.getItem('taskforge-theme') || 'light';
-  html.setAttribute('data-theme', savedTheme);
-  updateThemeIcon(savedTheme);
-
-  themeToggle.addEventListener('click', () => {
-    const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-    html.setAttribute('data-theme', next);
-    localStorage.setItem('taskforge-theme', next);
-    updateThemeIcon(next);
-  });
-
-  function updateThemeIcon(theme) {
-    const icon = themeToggle.querySelector('i');
-    icon.className = theme === 'dark' ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
-  }
+  const emptyState  = document.getElementById('empty-state');
+  const toast       = document.getElementById('toast');
 
   // ── Persist ────────────────────────────────────────────────────────────────
   function save() {
@@ -36,7 +21,7 @@
   }
 
   // ── Render ─────────────────────────────────────────────────────────────────
-  function render() {
+  function render(newId) {
     taskList.innerHTML = '';
 
     const filtered = tasks.filter(t => {
@@ -45,18 +30,78 @@
       return true;
     });
 
-    filtered.forEach(task => {
-      const li = createElement(task);
-      taskList.appendChild(li);
+    if (filtered.length === 0) {
+      emptyState.hidden = false;
+      updateFooter();
+      return;
+    }
+
+    emptyState.hidden = true;
+
+    const today = new Date().toISOString().slice(0, 10);
+    const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+
+    // Separate active vs completed
+    const active    = filtered.filter(t => !t.completed);
+    const completed = filtered.filter(t =>  t.completed);
+
+    // Group active tasks
+    const groups = [
+      { key: 'overdue',  label: 'Overdue',   tasks: active.filter(t => t.due && t.due < today) },
+      { key: 'today',    label: 'Today',      tasks: active.filter(t => t.due === today) },
+      { key: 'tomorrow', label: 'Tomorrow',   tasks: active.filter(t => t.due === tomorrow) },
+      { key: 'upcoming', label: 'Upcoming',   tasks: active.filter(t => t.due && t.due > tomorrow) },
+      { key: 'nodate',   label: 'No due date',tasks: active.filter(t => !t.due) },
+    ].filter(g => g.tasks.length > 0);
+
+    if (completed.length > 0) {
+      groups.push({ key: 'completed', label: 'Completed', tasks: completed });
+    }
+
+    // If only one group and it's "nodate", skip the header for cleanliness
+    const skipSingleNodateHeader = groups.length === 1 && groups[0].key === 'nodate';
+
+    groups.forEach(group => {
+      if (!skipSingleNodateHeader) {
+        const header = document.createElement('li');
+        header.className = 'group-header group-header--' + group.key;
+        header.textContent = group.label;
+        taskList.appendChild(header);
+      }
+      group.tasks.forEach(task => {
+        const li = createElement(task, task.id === newId);
+        taskList.appendChild(li);
+      });
     });
 
     updateFooter();
+    setupDragAndDrop();
   }
 
-  function createElement(task) {
+  // ── Due date helpers ───────────────────────────────────────────────────────
+  function dueDateStatus(due) {
+    if (!due) return null;
+    const today = new Date().toISOString().slice(0, 10);
+    if (due < today)  return 'overdue';
+    if (due === today) return 'due-today';
+    return 'upcoming';
+  }
+
+  function formatDue(due) {
+    if (!due) return '';
+    const [y, m, d] = due.split('-');
+    const today = new Date().toISOString().slice(0, 10);
+    if (due === today) return 'Today';
+    const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+    if (due === tomorrow) return 'Tomorrow';
+    return new Date(due + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  }
+
+  function createElement(task, bounce = false) {
     const li = document.createElement('li');
-    li.className = 'task-item' + (task.completed ? ' completed' : '');
+    li.className = 'task-item' + (task.completed ? ' completed' : '') + (bounce ? ' bounce' : '');
     li.dataset.id = task.id;
+    li.draggable = true;
 
     // Checkbox
     const checkbox = document.createElement('input');
@@ -65,10 +110,28 @@
     checkbox.checked = task.completed;
     checkbox.setAttribute('aria-label', 'Mark task complete');
 
-    // Text
+    // Meta (text + due)
+    const meta = document.createElement('div');
+    meta.className = 'task-meta';
+
     const span = document.createElement('span');
     span.className = 'task-text';
     span.textContent = task.text;
+    meta.appendChild(span);
+
+    // Due date badge (read-only, shown only when a date is set)
+    if (task.due) {
+      const status = dueDateStatus(task.due);
+      const dueRow = document.createElement('div');
+      dueRow.className = 'task-due' + (status === 'overdue' ? ' overdue' : status === 'due-today' ? ' due-today' : '');
+      const calIcon = document.createElement('i');
+      calIcon.className = 'fa-regular fa-calendar';
+      const dueLabel = document.createElement('span');
+      dueLabel.textContent = formatDue(task.due);
+      dueRow.appendChild(calIcon);
+      dueRow.appendChild(dueLabel);
+      meta.appendChild(dueRow);
+    }
 
     // Actions
     const actions = document.createElement('div');
@@ -88,7 +151,7 @@
     actions.appendChild(deleteBtn);
 
     li.appendChild(checkbox);
-    li.appendChild(span);
+    li.appendChild(meta);
     li.appendChild(actions);
 
     return li;
@@ -108,12 +171,13 @@
     const task = {
       id: Date.now().toString(),
       text,
-      completed: false
+      completed: false,
+      due: null
     };
 
     tasks.unshift(task);
     save();
-    render();
+    render(task.id);
     input.value = '';
     input.focus();
   });
@@ -126,11 +190,14 @@
 
     // Delete
     if (e.target.closest('.btn-delete')) {
+      const task = tasks.find(t => t.id === id);
+      undoSnapshot = { tasks: JSON.parse(JSON.stringify(tasks)), deletedTask: task };
       li.classList.add('removing');
       li.addEventListener('animationend', () => {
         tasks = tasks.filter(t => t.id !== id);
         save();
         render();
+        showToast(`"${task.text.slice(0, 28)}${task.text.length > 28 ? '…' : ''}" deleted`, true);
       }, { once: true });
       return;
     }
@@ -155,20 +222,64 @@
 
   // ── Edit ───────────────────────────────────────────────────────────────────
   function startEdit(li, id) {
+    const meta = li.querySelector('.task-meta');
     const span = li.querySelector('.task-text');
     const actions = li.querySelector('.task-actions');
     const task = tasks.find(t => t.id === id);
     if (!task) return;
 
-    // Replace span with input
+    // Disable drag while editing, highlight edit state
+    li.draggable = false;
+    li.classList.add('editing');
+
+    // Replace text span with input
     const editInput = document.createElement('input');
     editInput.type = 'text';
     editInput.className = 'task-edit-input';
     editInput.value = task.text;
     editInput.maxLength = 120;
-    li.replaceChild(editInput, span);
+    meta.replaceChild(editInput, span);
 
-    // Replace edit button with save button
+    // Remove existing due badge if any
+    const existingDue = meta.querySelector('.task-due');
+    if (existingDue) meta.removeChild(existingDue);
+
+    // Bottom row: date picker
+    const editRow = document.createElement('div');
+    editRow.className = 'task-meta-edit-row';
+
+    function renderDuePicker() {
+      duePicker.innerHTML = '';
+      const icon = document.createElement('i');
+      icon.className = 'fa-regular fa-calendar';
+      const label = document.createElement('span');
+      label.textContent = task.due ? formatDue(task.due) : 'Set date';
+      duePicker.appendChild(icon);
+      duePicker.appendChild(label);
+      duePicker.className = 'due-pick-btn';
+      if (task.due) {
+        const s = dueDateStatus(task.due);
+        if (s === 'overdue') duePicker.classList.add('overdue');
+        else if (s === 'due-today') duePicker.classList.add('due-today');
+      }
+    }
+
+    const duePicker = document.createElement('button');
+    duePicker.type = 'button';
+    renderDuePicker();
+    duePicker.addEventListener('mousedown', e => e.stopPropagation());
+    duePicker.addEventListener('click', e => {
+      e.stopPropagation();
+      openDateModal(task, (picked) => {
+        task.due = picked;
+        renderDuePicker();
+      });
+    });
+    editRow.appendChild(duePicker);
+
+    meta.appendChild(editRow);
+
+    // Move save button into the edit row (right-aligned via flex spacer)
     const editBtn = actions.querySelector('.btn-edit');
     const saveBtn = document.createElement('button');
     saveBtn.className = 'btn-icon btn-save';
@@ -189,14 +300,200 @@
     saveBtn.addEventListener('click', commitEdit);
     editInput.addEventListener('keydown', e => {
       if (e.key === 'Enter')  { e.preventDefault(); commitEdit(); }
-      if (e.key === 'Escape') { render(); } // cancel
+      if (e.key === 'Escape') { render(); }
     });
     editInput.addEventListener('blur', () => {
-      // Small delay so save button click fires first
       setTimeout(() => {
-        if (document.activeElement !== saveBtn) commitEdit();
+        if (document.activeElement !== saveBtn && !document.querySelector('.date-modal-overlay')) commitEdit();
       }, 150);
     });
+  }
+
+  // ── Date Modal ─────────────────────────────────────────────────────────────
+  function openDateModal(task, onPick) {
+    // Remove any existing modal
+    const existing = document.querySelector('.date-modal-overlay');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.className = 'date-modal-overlay';
+
+    const modal = document.createElement('div');
+    modal.className = 'date-modal';
+
+    const title = document.createElement('p');
+    title.className = 'date-modal-title';
+    title.textContent = 'Set due date';
+    modal.appendChild(title);
+
+    const dateInput = document.createElement('input');
+    dateInput.type = 'date';
+    dateInput.className = 'date-modal-input';
+    dateInput.value = task.due || '';
+    if (!task.due) dateInput.classList.add('empty');
+    dateInput.addEventListener('change', () => {
+      dateInput.classList.toggle('empty', !dateInput.value);
+    });
+    modal.appendChild(dateInput);
+
+    const btns = document.createElement('div');
+    btns.className = 'date-modal-btns';
+
+    const clearBtn = document.createElement('button');
+    clearBtn.type = 'button';
+    clearBtn.className = 'date-modal-btn date-modal-clear';
+    clearBtn.textContent = 'Clear';
+    clearBtn.addEventListener('click', () => {
+      onPick(null);
+      overlay.remove();
+    });
+
+    const confirmBtn = document.createElement('button');
+    confirmBtn.type = 'button';
+    confirmBtn.className = 'date-modal-btn date-modal-confirm';
+    confirmBtn.textContent = 'Confirm';
+    confirmBtn.addEventListener('click', () => {
+      onPick(dateInput.value || null);
+      overlay.remove();
+    });
+
+    btns.appendChild(clearBtn);
+    btns.appendChild(confirmBtn);
+    modal.appendChild(btns);
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+
+    // Close on overlay click
+    overlay.addEventListener('click', e => {
+      if (e.target === overlay) overlay.remove();
+    });
+
+    // Focus the input to open picker on supporting browsers
+    setTimeout(() => dateInput.focus(), 50);
+  }
+
+  // ── Toast ──────────────────────────────────────────────────────────────────
+  function showToast(message, withUndo = false) {
+    clearTimeout(toastTimer);
+    toast.innerHTML = '';
+
+    const msg = document.createElement('span');
+    msg.textContent = message;
+    toast.appendChild(msg);
+
+    if (withUndo) {
+      const undoBtn = document.createElement('button');
+      undoBtn.className = 'toast-undo';
+      undoBtn.textContent = 'Undo';
+      undoBtn.addEventListener('click', () => {
+        if (undoSnapshot) {
+          tasks = undoSnapshot.tasks;
+          save();
+          render();
+          undoSnapshot = null;
+        }
+        hideToast();
+      });
+      toast.appendChild(undoBtn);
+    }
+
+    toast.classList.add('show');
+    toastTimer = setTimeout(hideToast, 4000);
+  }
+
+  function hideToast() {
+    toast.classList.remove('show');
+    undoSnapshot = null;
+  }
+
+  // ── Drag and Drop (reorder) ────────────────────────────────────────────────
+  let dragSrcId = null;
+
+  // Single reusable drop-line element
+  const dropLine = document.createElement('div');
+  dropLine.className = 'drop-line';
+
+  function removeDropLine() {
+    if (dropLine.parentNode) dropLine.parentNode.removeChild(dropLine);
+  }
+
+  function setupDragAndDrop() {
+    const items = taskList.querySelectorAll('.task-item');
+    items.forEach(item => {
+      item.addEventListener('dragstart', onDragStart);
+      item.addEventListener('dragend',   onDragEnd);
+    });
+    taskList.addEventListener('dragover', onListDragOver);
+    taskList.addEventListener('dragleave', onListDragLeave);
+    taskList.addEventListener('drop', onListDrop);
+  }
+
+  function onDragStart(e) {
+    dragSrcId = this.dataset.id;
+    this.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', dragSrcId);
+  }
+
+  function onListDragOver(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (!dragSrcId) return;
+
+    // Find which item we're over
+    const items = [...taskList.querySelectorAll('.task-item:not(.dragging)')];
+    let insertBeforeEl = null;
+
+    for (const item of items) {
+      const rect = item.getBoundingClientRect();
+      if (e.clientY < rect.top + rect.height / 2) {
+        insertBeforeEl = item;
+        break;
+      }
+    }
+
+    // Place the drop line
+    if (insertBeforeEl) {
+      taskList.insertBefore(dropLine, insertBeforeEl);
+    } else {
+      taskList.appendChild(dropLine);
+    }
+  }
+
+  function onListDragLeave(e) {
+    if (!taskList.contains(e.relatedTarget)) {
+      removeDropLine();
+    }
+  }
+
+  function onListDrop(e) {
+    e.preventDefault();
+    if (!dragSrcId) return;
+
+    const srcIdx = tasks.findIndex(t => t.id === dragSrcId);
+    if (srcIdx === -1) { removeDropLine(); return; }
+
+    // Find what element comes after the drop line
+    const nextEl = dropLine.nextElementSibling;
+    removeDropLine();
+
+    const [moved] = tasks.splice(srcIdx, 1);
+
+    if (nextEl && nextEl.dataset.id) {
+      const tgtIdx = tasks.findIndex(t => t.id === nextEl.dataset.id);
+      tasks.splice(tgtIdx === -1 ? tasks.length : tgtIdx, 0, moved);
+    } else {
+      tasks.push(moved);
+    }
+
+    save();
+    render();
+  }
+
+  function onDragEnd() {
+    removeDropLine();
+    taskList.querySelectorAll('.task-item').forEach(i => i.classList.remove('dragging'));
+    dragSrcId = null;
   }
 
   // ── Filters ────────────────────────────────────────────────────────────────
