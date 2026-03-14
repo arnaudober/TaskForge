@@ -389,15 +389,23 @@
   // ── Drag and Drop (reorder) ────────────────────────────────────────────────
   let dragSrcId = null;
 
+  // Single reusable drop-line element
+  const dropLine = document.createElement('div');
+  dropLine.className = 'drop-line';
+
+  function removeDropLine() {
+    if (dropLine.parentNode) dropLine.parentNode.removeChild(dropLine);
+  }
+
   function setupDragAndDrop() {
     const items = taskList.querySelectorAll('.task-item');
     items.forEach(item => {
       item.addEventListener('dragstart', onDragStart);
-      item.addEventListener('dragover',  onDragOver);
-      item.addEventListener('dragleave', onDragLeave);
-      item.addEventListener('drop',      onDrop);
       item.addEventListener('dragend',   onDragEnd);
     });
+    taskList.addEventListener('dragover', onListDragOver);
+    taskList.addEventListener('dragleave', onListDragLeave);
+    taskList.addEventListener('drop', onListDrop);
   }
 
   function onDragStart(e) {
@@ -407,58 +415,64 @@
     e.dataTransfer.setData('text/plain', dragSrcId);
   }
 
-  function onDragOver(e) {
+  function onListDragOver(e) {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
-    if (this.dataset.id === dragSrcId) return;
-    clearDropIndicators();
-    const rect = this.getBoundingClientRect();
-    const midY = rect.top + rect.height / 2;
-    this._dropBefore = e.clientY < midY;
-    if (this._dropBefore) {
-      this.classList.add('drop-before');
+    if (!dragSrcId) return;
+
+    // Find which item we're over
+    const items = [...taskList.querySelectorAll('.task-item:not(.dragging)')];
+    let insertBeforeEl = null;
+
+    for (const item of items) {
+      const rect = item.getBoundingClientRect();
+      if (e.clientY < rect.top + rect.height / 2) {
+        insertBeforeEl = item;
+        break;
+      }
+    }
+
+    // Place the drop line
+    if (insertBeforeEl) {
+      taskList.insertBefore(dropLine, insertBeforeEl);
     } else {
-      this.classList.add('drop-after');
+      taskList.appendChild(dropLine);
     }
   }
 
-  function onDragLeave(e) {
-    if (!this.contains(e.relatedTarget)) {
-      this.classList.remove('drop-before', 'drop-after');
-      this._dropBefore = undefined;
+  function onListDragLeave(e) {
+    if (!taskList.contains(e.relatedTarget)) {
+      removeDropLine();
     }
   }
 
-  function clearDropIndicators() {
-    taskList.querySelectorAll('.task-item').forEach(i => {
-      i.classList.remove('drop-before', 'drop-after');
-    });
-  }
-
-  function onDrop(e) {
+  function onListDrop(e) {
     e.preventDefault();
-    clearDropIndicators();
-    const targetId = this.dataset.id;
-    if (!dragSrcId || dragSrcId === targetId) return;
+    if (!dragSrcId) return;
 
     const srcIdx = tasks.findIndex(t => t.id === dragSrcId);
-    let tgtIdx   = tasks.findIndex(t => t.id === targetId);
-    if (srcIdx === -1 || tgtIdx === -1) return;
+    if (srcIdx === -1) { removeDropLine(); return; }
 
-    const targetEl = taskList.querySelector(`[data-id="${targetId}"]`);
-    const insertBefore = targetEl && targetEl._dropBefore;
+    // Find what element comes after the drop line
+    const nextEl = dropLine.nextElementSibling;
+    removeDropLine();
 
     const [moved] = tasks.splice(srcIdx, 1);
-    tgtIdx = tasks.findIndex(t => t.id === targetId);
-    tasks.splice(insertBefore ? tgtIdx : tgtIdx + 1, 0, moved);
+
+    if (nextEl && nextEl.dataset.id) {
+      const tgtIdx = tasks.findIndex(t => t.id === nextEl.dataset.id);
+      tasks.splice(tgtIdx === -1 ? tasks.length : tgtIdx, 0, moved);
+    } else {
+      tasks.push(moved);
+    }
+
     save();
     render();
   }
 
   function onDragEnd() {
-    taskList.querySelectorAll('.task-item').forEach(i => {
-      i.classList.remove('dragging', 'drop-before', 'drop-after');
-    });
+    removeDropLine();
+    taskList.querySelectorAll('.task-item').forEach(i => i.classList.remove('dragging'));
     dragSrcId = null;
   }
 

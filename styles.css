@@ -338,41 +338,14 @@ header {
   border-color: var(--primary);
   transform: translateX(2px);
 }
-/* drop-before: centered in the gap above this item */
-.task-item.drop-before {
-  position: relative;
-}
-.task-item.drop-before::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
+/* Drop indicator line */
+.drop-line {
   height: 2px;
-  transform: translateY(-6px);
   background: var(--primary);
   border-radius: 2px;
   box-shadow: 0 0 8px rgba(108,99,255,0.55);
   pointer-events: none;
-  z-index: 2;
-}
-/* drop-after: centered in the gap below this item — use ::before to avoid body::after conflict */
-.task-item.drop-after {
-  position: relative;
-}
-.task-item.drop-after::before {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  transform: translateY(6px);
-  background: var(--primary);
-  border-radius: 2px;
-  box-shadow: 0 0 8px rgba(108,99,255,0.55);
-  pointer-events: none;
-  z-index: 2;
+  margin: 0;
 }
 .task-item.dragging {
   opacity: 0.4;
