@@ -11,28 +11,9 @@
   const taskList    = document.getElementById('task-list');
   const taskCount   = document.getElementById('task-count');
   const clearBtn    = document.getElementById('clear-completed');
-  const themeToggle = document.getElementById('theme-toggle');
   const filterBtns  = document.querySelectorAll('.filter-btn');
   const emptyState  = document.getElementById('empty-state');
   const toast       = document.getElementById('toast');
-  const html        = document.documentElement;
-
-  // ── Theme ──────────────────────────────────────────────────────────────────
-  const savedTheme = localStorage.getItem('taskforge-theme') || 'light';
-  html.setAttribute('data-theme', savedTheme);
-  updateThemeIcon(savedTheme);
-
-  themeToggle.addEventListener('click', () => {
-    const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-    html.setAttribute('data-theme', next);
-    localStorage.setItem('taskforge-theme', next);
-    updateThemeIcon(next);
-  });
-
-  function updateThemeIcon(theme) {
-    const icon = themeToggle.querySelector('i');
-    icon.className = theme === 'dark' ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
-  }
 
   // ── Persist ────────────────────────────────────────────────────────────────
   function save() {

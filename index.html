@@ -10,30 +10,22 @@
 <body>
   <div class="container">
     <header>
-      <div class="logo">
-        <i class="fa-solid fa-bolt"></i>
-        <h1>TaskForge</h1>
-      </div>
-      <button id="theme-toggle" aria-label="Toggle dark mode">
-        <i class="fa-solid fa-moon"></i>
-      </button>
+      <h1 class="logo-text">TaskForge</h1>
     </header>
 
     <form id="task-form">
       <div class="input-wrapper">
-        <i class="fa-solid fa-pen-to-square input-icon"></i>
         <input
           type="text"
           id="task-input"
-          placeholder="Add a new task…"
+          placeholder="What needs to be done?"
           autocomplete="off"
           maxlength="120"
         />
+        <button type="submit" id="add-btn">
+          <i class="fa-solid fa-arrow-up"></i>
+        </button>
       </div>
-      <button type="submit" id="add-btn">
-        <i class="fa-solid fa-plus"></i>
-        <span>Add</span>
-      </button>
     </form>
 
     <div class="filters">
