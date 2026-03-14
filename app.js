@@ -127,15 +127,25 @@
     dueLabel.textContent = task.due ? formatDue(task.due) : 'Set date';
     dueLabel.style.cursor = 'pointer';
     dueLabel.style.opacity = task.due ? '1' : '0.5';
-    dueLabel.addEventListener('click', () => dueInput.showPicker?.() || dueInput.click());
 
-    dueInput.style.display = 'none';
+    dueInput.style.position = 'absolute';
+    dueInput.style.opacity = '0';
+    dueInput.style.pointerEvents = 'none';
+    dueInput.style.width = '0';
+    dueInput.style.height = '0';
+
+    dueLabel.addEventListener('click', (e) => {
+      e.stopPropagation();
+      try { dueInput.showPicker(); } catch (_) { dueInput.click(); }
+    });
+
     dueInput.addEventListener('change', () => {
       task.due = dueInput.value || null;
       save();
       render();
     });
 
+    dueRow.style.position = 'relative';
     dueRow.appendChild(dueLabel);
     dueRow.appendChild(dueInput);
     meta.appendChild(dueRow);
@@ -329,34 +339,54 @@
   function onDragOver(e) {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
-    if (this.dataset.id !== dragSrcId) {
-      this.classList.add('drag-over');
+    if (this.dataset.id === dragSrcId) return;
+    clearDropIndicators();
+    const rect = this.getBoundingClientRect();
+    const midY = rect.top + rect.height / 2;
+    if (e.clientY < midY) {
+      this.classList.add('drop-before');
+    } else {
+      this.classList.add('drop-after');
     }
   }
 
-  function onDragLeave() {
-    this.classList.remove('drag-over');
+  function onDragLeave(e) {
+    if (!this.contains(e.relatedTarget)) {
+      this.classList.remove('drop-before', 'drop-after');
+    }
+  }
+
+  function clearDropIndicators() {
+    taskList.querySelectorAll('.task-item').forEach(i => {
+      i.classList.remove('drop-before', 'drop-after');
+    });
   }
 
   function onDrop(e) {
     e.preventDefault();
-    this.classList.remove('drag-over');
+    clearDropIndicators();
     const targetId = this.dataset.id;
     if (!dragSrcId || dragSrcId === targetId) return;
 
     const srcIdx = tasks.findIndex(t => t.id === dragSrcId);
-    const tgtIdx = tasks.findIndex(t => t.id === targetId);
+    let tgtIdx   = tasks.findIndex(t => t.id === targetId);
     if (srcIdx === -1 || tgtIdx === -1) return;
 
+    // Determine if dropping before or after the target
+    const targetEl = taskList.querySelector(`[data-id="${targetId}"]`);
+    const rect = targetEl ? targetEl.getBoundingClientRect() : null;
+    const insertBefore = rect && e.clientY < rect.top + rect.height / 2;
+
     const [moved] = tasks.splice(srcIdx, 1);
-    tasks.splice(tgtIdx, 0, moved);
+    tgtIdx = tasks.findIndex(t => t.id === targetId);
+    tasks.splice(insertBefore ? tgtIdx : tgtIdx + 1, 0, moved);
     save();
     render();
   }
 
   function onDragEnd() {
     taskList.querySelectorAll('.task-item').forEach(i => {
-      i.classList.remove('dragging', 'drag-over');
+      i.classList.remove('dragging', 'drop-before', 'drop-after');
     });
     dragSrcId = null;
   }
