@@ -32,13 +32,47 @@
 
     if (filtered.length === 0) {
       emptyState.hidden = false;
-    } else {
-      emptyState.hidden = true;
-      filtered.forEach(task => {
+      updateFooter();
+      return;
+    }
+
+    emptyState.hidden = true;
+
+    const today = new Date().toISOString().slice(0, 10);
+    const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+
+    // Separate active vs completed
+    const active    = filtered.filter(t => !t.completed);
+    const completed = filtered.filter(t =>  t.completed);
+
+    // Group active tasks
+    const groups = [
+      { key: 'overdue',  label: 'Overdue',   tasks: active.filter(t => t.due && t.due < today) },
+      { key: 'today',    label: 'Today',      tasks: active.filter(t => t.due === today) },
+      { key: 'tomorrow', label: 'Tomorrow',   tasks: active.filter(t => t.due === tomorrow) },
+      { key: 'upcoming', label: 'Upcoming',   tasks: active.filter(t => t.due && t.due > tomorrow) },
+      { key: 'nodate',   label: 'No due date',tasks: active.filter(t => !t.due) },
+    ].filter(g => g.tasks.length > 0);
+
+    if (completed.length > 0) {
+      groups.push({ key: 'completed', label: 'Completed', tasks: completed });
+    }
+
+    // If only one group and it's "nodate", skip the header for cleanliness
+    const skipSingleNodateHeader = groups.length === 1 && groups[0].key === 'nodate';
+
+    groups.forEach(group => {
+      if (!skipSingleNodateHeader) {
+        const header = document.createElement('li');
+        header.className = 'group-header group-header--' + group.key;
+        header.textContent = group.label;
+        taskList.appendChild(header);
+      }
+      group.tasks.forEach(task => {
         const li = createElement(task, task.id === newId);
         taskList.appendChild(li);
       });
-    }
+    });
 
     updateFooter();
     setupDragAndDrop();
@@ -210,22 +244,15 @@
     const existingDue = meta.querySelector('.task-due');
     if (existingDue) meta.removeChild(existingDue);
 
-    // Bottom row: date picker + save button side by side
+    // Bottom row: date picker
     const editRow = document.createElement('div');
     editRow.className = 'task-meta-edit-row';
 
-    // Calendar icon
-    const calIcon = document.createElement('i');
-    calIcon.className = 'fa-regular fa-calendar';
-    calIcon.style.color = 'var(--text-muted)';
-    calIcon.style.fontSize = '0.75rem';
-    editRow.appendChild(calIcon);
-
-    // Date picker button
+    // Date picker button (no border, no icon — inline text style)
     const duePicker = document.createElement('button');
     duePicker.type = 'button';
     duePicker.className = 'due-pick-btn';
-    duePicker.textContent = task.due ? formatDue(task.due) : 'Set date';
+    duePicker.textContent = task.due ? '📅 ' + formatDue(task.due) : '📅 Set date';
     if (task.due) {
       const s = dueDateStatus(task.due);
       if (s === 'overdue') duePicker.classList.add('overdue');
@@ -236,7 +263,7 @@
       e.stopPropagation();
       openDateModal(task, (picked) => {
         task.due = picked;
-        duePicker.textContent = picked ? formatDue(picked) : 'Set date';
+        duePicker.textContent = picked ? '📅 ' + formatDue(picked) : '📅 Set date';
         duePicker.className = 'due-pick-btn';
         if (picked) {
           const s = dueDateStatus(picked);
