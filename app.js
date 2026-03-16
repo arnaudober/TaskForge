@@ -214,7 +214,7 @@
       if (task) {
         task.completed = e.target.checked;
         save();
-        li.classList.toggle('completed', task.completed);
+        render();
         updateFooter();
       }
     }
